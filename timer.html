@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midnight Alarm</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            background-color: #09090b;
+            color: #fafafa;
+        }
+
+        .clock-font {
+            font-family: 'JetBrains+Mono', monospace;
+        }
+
+        .glow {
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .countdown-glow {
+            text-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .alarm-glow {
+            text-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { color: #ef4444; transform: scale(1); }
+            50% { color: #fca5a5; transform: scale(1.01); }
+        }
+
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden">
+
+    <div class="glass-panel p-8 md:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center">
+        <h1 class="text-zinc-500 uppercase tracking-[0.4em] text-[10px] mb-4">Current System Time</h1>
+        
+        <div class="flex flex-col items-center mb-2">
+            <div id="clock-display" class="clock-font text-5xl md:text-6xl font-bold glow text-emerald-400">
+                12:00:00
+            </div>
+            <div id="ampm-display" class="text-emerald-500/60 font-bold tracking-widest text-sm mt-1 uppercase">
+                --
+            </div>
+        </div>
+
+        <div id="date-display" class="text-zinc-500 text-xs mb-8 tracking-wider">
+            -- -- ----
+        </div>
+
+        <!-- Countdown Section -->
+        <div class="mb-8 p-6 rounded-2xl bg-blue-500/5 border border-blue-500/10">
+            <h2 class="text-blue-400/70 uppercase tracking-widest text-[9px] font-bold mb-3">Time Until 12:00 AM</h2>
+            <div id="countdown-display" class="clock-font text-3xl md:text-4xl font-bold text-blue-400 countdown-glow">
+                00h 00m 00s <span class="text-xl text-blue-400/60">000</span>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div id="status-card" class="bg-zinc-900/50 rounded-2xl p-4 border border-emerald-500/10">
+                <p id="alarm-status" class="text-emerald-500/80 text-sm font-medium italic">Monitoring for Midnight...</p>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="testAlarm()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl transition-all text-sm font-medium border border-zinc-700/50">
+                    Test Sound
+                </button>
+                <button id="stop-btn" onclick="stopAlarm()" class="hidden flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl transition-all text-sm font-bold shadow-lg shadow-red-900/20">
+                    DISMISS ALARM
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="modal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-50 p-6 backdrop-blur-md">
+        <div class="glass-panel p-10 rounded-[3rem] text-center max-w-sm w-full border-red-500/40">
+            <div class="w-20 h-20 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <h2 class="text-3xl font-bold text-white mb-2 tracking-tight">12:00 AM</h2>
+            <p class="text-zinc-400 mb-8 leading-relaxed">Midnight has arrived. Wake up!</p>
+            <button onclick="stopAlarm()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-500 transition-all shadow-xl shadow-red-600/30 active:scale-95">
+                DISMISS
+            </button>
+        </div>
+    </div>
+
+    <audio id="alarm-audio" loop preload="auto">
+        <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+    </audio>
+
+    <script>
+        const clockDisplay = document.getElementById('clock-display');
+        const ampmDisplay = document.getElementById('ampm-display');
+        const countdownDisplay = document.getElementById('countdown-display');
+        const dateDisplay = document.getElementById('date-display');
+        const alarmStatus = document.getElementById('alarm-status');
+        const audio = document.getElementById('alarm-audio');
+        const modal = document.getElementById('modal');
+        const stopBtn = document.getElementById('stop-btn');
+        const statusCard = document.getElementById('status-card');
+
+        let alarmTriggered = false;
+
+        function updateDisplay() {
+            const now = new Date();
+            
+            // 1. Update Standard Clock (12-hour format)
+            let rawHours = now.getHours();
+            const ampm = rawHours >= 12 ? 'PM' : 'AM';
+            const displayHours = rawHours % 12 || 12; // Convert 0 to 12
+            
+            const h = String(displayHours).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            
+            clockDisplay.textContent = `${h}:${m}:${s}`;
+            ampmDisplay.textContent = ampm;
+
+            // 2. Update Date
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateDisplay.textContent = now.toLocaleDateString(undefined, options);
+
+            // 3. Update Countdown to Midnight (next 00:00:00)
+            const midnight = new Date();
+            midnight.setHours(24, 0, 0, 0); 
+            
+            const diff = midnight - now;
+            
+            if (diff > 0) {
+                const cdH = Math.floor(diff / (1000 * 60 * 60));
+                const cdM = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const cdS = Math.floor((diff % (1000 * 60)) / 1000);
+                const cdMs = Math.floor(diff % 1000);
+
+                countdownDisplay.innerHTML = `
+                    ${String(cdH).padStart(2, '0')}h 
+                    ${String(cdM).padStart(2, '0')}m 
+                    ${String(cdS).padStart(2, '0')}s 
+                    <span class="text-xl text-blue-400/60">${String(cdMs).padStart(3, '0')}</span>
+                `;
+            } else {
+                countdownDisplay.innerHTML = `00h 00m 00s <span class="text-xl text-blue-400/60">000</span>`;
+            }
+
+            // 4. Alarm Logic (triggers at 12:00:00 AM)
+            // rawHours is 0 at 12:00 AM in 24h clock
+            if (rawHours === 0 && now.getMinutes() === 0 && now.getSeconds() === 0 && !alarmTriggered) {
+                triggerAlarm();
+            }
+
+            // Reset trigger state shortly after midnight so it can trigger the next night
+            if (rawHours === 0 && now.getMinutes() === 1) {
+                alarmTriggered = false;
+            }
+
+            requestAnimationFrame(updateDisplay);
+        }
+
+        function triggerAlarm() {
+            alarmTriggered = true;
+            
+            clockDisplay.classList.remove('glow', 'text-emerald-400');
+            clockDisplay.classList.add('alarm-glow', 'text-red-500');
+            ampmDisplay.classList.remove('text-emerald-500/60');
+            ampmDisplay.classList.add('text-red-500/80');
+            
+            statusCard.classList.remove('border-emerald-500/10');
+            statusCard.classList.add('border-red-500/50', 'bg-red-950/20');
+            alarmStatus.textContent = "ALARM ACTIVE!";
+            alarmStatus.classList.add('text-red-500');
+            
+            stopBtn.classList.remove('hidden');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            audio.play().catch(() => {
+                alarmStatus.textContent = "ALARM ACTIVE (Tap to enable sound)";
+            });
+        }
+
+        function stopAlarm() {
+            audio.pause();
+            audio.currentTime = 0;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            stopBtn.classList.add('hidden');
+            
+            clockDisplay.classList.add('glow', 'text-emerald-400');
+            clockDisplay.classList.remove('alarm-glow', 'text-red-500');
+            ampmDisplay.classList.add('text-emerald-500/60');
+            ampmDisplay.classList.remove('text-red-500/80');
+
+            statusCard.classList.add('border-emerald-500/10');
+            statusCard.classList.remove('border-red-500/50', 'bg-red-950/20');
+            alarmStatus.textContent = "Monitoring for Midnight...";
+            alarmStatus.classList.remove('text-red-500');
+        }
+
+        function testAlarm() {
+            triggerAlarm();
+            alarmStatus.textContent = "TESTING SYSTEM...";
+            alarmTriggered = false; 
+        }
+
+        requestAnimationFrame(updateDisplay);
+    </script>
+</body>
+</html>
