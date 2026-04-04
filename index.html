@@ -2,44 +2,69 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>4-Letter Name Finder</title>
+    <title>Roblox 4-Letter Live Checker</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 50px; background: #111; color: white; }
-        .container { background: #222; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .name-box { font-size: 48px; font-family: monospace; color: #00ff41; margin: 20px; letter-spacing: 5px; }
-        button { padding: 12px 25px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; transition: 0.2s; }
-        button:hover { background: #0056b3; }
-        .check-link { display: block; margin-top: 20px; color: #aaa; text-decoration: none; font-size: 14px; }
-        .check-link:hover { color: #fff; text-decoration: underline; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 50px; background: #0a0a0a; color: white; }
+        .card { background: #1a1a1a; padding: 40px; border-radius: 20px; display: inline-block; border: 1px solid #333; }
+        #display { font-size: 60px; font-family: monospace; margin: 20px; color: #555; }
+        #status { font-size: 20px; margin-bottom: 20px; font-weight: bold; height: 30px; }
+        .available { color: #00ff41; text-shadow: 0 0 10px #00ff41; }
+        .taken { color: #ff4b2b; }
+        button { padding: 15px 30px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; }
+        button:disabled { background: #444; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h2>4-Letter Finder</h2>
-        <div class="name-box" id="display">????</div>
-        <button onclick="generateName()">Generate & Prep Link</button>
-        <a id="checker" class="check-link" target="_blank">Click here to check if taken</a>
+    <div class="card">
+        <h2>Live 4-Letter Availability</h2>
+        <div id="display">----</div>
+        <div id="status">Ready...</div>
+        <button id="btn" onclick="checkName()">Generate & Check</button>
     </div>
 
     <script>
-        function generateName() {
-            // Characters allowed by Roblox: Letters, Numbers, and one Underscore
+        async function checkName() {
+            const btn = document.getElementById('btn');
+            const display = document.getElementById('display');
+            const status = document.getElementById('status');
+            
+            // 1. Generate a random 4-char name
             const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-            let result = "";
+            let name = "";
             for (let i = 0; i < 4; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
+                name += chars.charAt(Math.floor(Math.random() * chars.length));
             }
             
-            document.getElementById("display").innerText = result;
-            
-            // Updates the link to search Roblox for that specific user
-            const searchUrl = "https://www.roblox.com/search/users?keyword=" + result;
-            const linkElem = document.getElementById("checker");
-            linkElem.href = searchUrl;
-            linkElem.innerText = "Check availability for: " + result;
+            display.innerText = name;
+            status.innerText = "Checking...";
+            status.className = "";
+            btn.disabled = true;
+
+            try {
+                // 2. Use a proxy to bypass CORS (using AllOrigins or similar)
+                // We check the 'users' endpoint to see if a user with that name exists
+                const proxy = "https://api.allorigins.win/get?url=";
+                const target = encodeURIComponent(`https://www.roblox.com/search/users?keyword=${name}`);
+                
+                const response = await fetch(proxy + target);
+                const data = await response.json();
+                
+                // 3. Logic: If the page content doesn't mention "No users found", it's likely taken
+                if (data.contents.includes("No users found")) {
+                    status.innerText = "AVAILABLE!";
+                    status.className = "available";
+                } else {
+                    status.innerText = "TAKEN";
+                    status.className = "taken";
+                }
+            } catch (error) {
+                status.innerText = "Error (Rate Limited)";
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
         }
     </script>
-
 </body>
 </html>
