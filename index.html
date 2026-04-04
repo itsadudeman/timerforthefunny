@@ -2,34 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Roblox 4-Letter Live Checker</title>
+    <title>Roblox Turbo Finder</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 50px; background: #0a0a0a; color: white; }
-        .card { background: #1a1a1a; padding: 40px; border-radius: 20px; display: inline-block; border: 1px solid #333; }
-        #display { font-size: 60px; font-family: monospace; margin: 20px; color: #555; }
-        #status { font-size: 20px; margin-bottom: 20px; font-weight: bold; height: 30px; }
-        .available { color: #00ff41; text-shadow: 0 0 10px #00ff41; }
-        .taken { color: #ff4b2b; }
-        button { padding: 15px 30px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; }
-        button:disabled { background: #444; cursor: not-allowed; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 50px; background: #020617; color: #f8fafc; }
+        .card { background: #1e293b; padding: 40px; border-radius: 24px; display: inline-block; border: 1px solid #334155; width: 400px; }
+        #display { font-size: 80px; font-family: 'Monaco', monospace; margin: 10px; color: #38bdf8; text-transform: lowercase; }
+        #status { font-size: 16px; margin-bottom: 20px; color: #94a3b8; letter-spacing: 1px; }
+        .available { color: #22c55e !important; text-shadow: 0 0 20px #22c55e; }
+        .taken { color: #ef4444 !important; }
+        button { width: 100%; padding: 18px; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 12px; font-size: 20px; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #2563eb; transform: scale(1.02); }
+        button:disabled { background: #334155; cursor: wait; opacity: 0.7; }
+        .log { margin-top: 20px; font-size: 12px; color: #64748b; text-align: left; background: #0f172a; padding: 10px; border-radius: 8px; max-height: 100px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>Live 4-Letter Availability</h2>
+        <h1 style="font-size: 24px; margin-bottom: 5px;">Turbo 4-Letter Finder</h1>
+        <p id="status">INITIALIZING...</p>
         <div id="display">----</div>
-        <div id="status">Ready...</div>
-        <button id="btn" onclick="checkName()">Generate & Check</button>
+        <button id="btn" onclick="hunt()">START SCAN</button>
+        
+        <div class="log" id="log">Logs:<br></div>
     </div>
 
     <script>
-        async function checkName() {
-            const btn = document.getElementById('btn');
-            const display = document.getElementById('display');
-            const status = document.getElementById('status');
-            
-            // 1. Generate a random 4-char name
+        const btn = document.getElementById('btn');
+        const display = document.getElementById('display');
+        const status = document.getElementById('status');
+        const log = document.getElementById('log');
+
+        function addLog(msg) {
+            log.innerHTML += `> ${msg}<br>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function hunt() {
+            btn.disabled = true;
+            status.innerText = "HUNTING...";
+
             const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
             let name = "";
             for (let i = 0; i < 4; i++) {
@@ -37,33 +49,44 @@
             }
             
             display.innerText = name;
-            status.innerText = "Checking...";
-            status.className = "";
-            btn.disabled = true;
 
             try {
-                // 2. Use a proxy to bypass CORS (using AllOrigins or similar)
-                // We check the 'users' endpoint to see if a user with that name exists
-                const proxy = "https://api.allorigins.win/get?url=";
-                const target = encodeURIComponent(`https://www.roblox.com/search/users?keyword=${name}`);
+                // Using the specific Auth API for username validation (V2)
+                // This is much faster than searching the whole site
+                const targetUrl = `https://auth.roblox.com/v2/usernames/validate?username=${name}&birthday=2000-01-01`;
                 
-                const response = await fetch(proxy + target);
+                // Switching to a cleaner proxy bypass
+                const proxy = "https://api.allorigins.win/get?url=";
+                
+                const response = await fetch(proxy + encodeURIComponent(targetUrl));
                 const data = await response.json();
                 
-                // 3. Logic: If the page content doesn't mention "No users found", it's likely taken
-                if (data.contents.includes("No users found")) {
-                    status.innerText = "AVAILABLE!";
-                    status.className = "available";
+                // Parse the internal Roblox JSON response
+                // code 0 usually means "Success/Available"
+                const robloxData = JSON.parse(data.contents);
+
+                if (robloxData.code === 0) {
+                    status.innerText = "!!! AVAILABLE !!!";
+                    display.className = "available";
+                    addLog(`FOUND: ${name}`);
+                    // STOP if found so you can claim it!
+                    return; 
                 } else {
-                    status.innerText = "TAKEN";
-                    status.className = "taken";
+                    display.className = "taken";
+                    addLog(`${name} is taken: ${robloxData.message}`);
                 }
-            } catch (error) {
-                status.innerText = "Error (Rate Limited)";
-                console.error(error);
-            } finally {
-                btn.disabled = false;
+
+            } catch (e) {
+                status.innerText = "RATE LIMITED - PAUSING";
+                addLog("Error: Roblox is blocking requests. Wait 30s.");
+                await new Promise(r => setTimeout(r, 5000)); // Wait 5 seconds before allowing retry
             }
+
+            // Short auto-delay before next check to stay under the radar
+            setTimeout(() => {
+                btn.disabled = false;
+                status.innerText = "READY FOR NEXT SCAN";
+            }, 800);
         }
     </script>
 </body>
